@@ -30,6 +30,7 @@ import {
   ChevronDown,
   Layers,
   Sparkles,
+  LayoutDashboard,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -55,7 +56,7 @@ interface SKU {
 export default function WholesalerPage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'approvals' | 'inward' | 'bhav' | 'orders' | 'khata'>('approvals');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'approvals' | 'inward' | 'bhav' | 'orders' | 'khata'>('dashboard');
 
   // Commodities & Inventory State
   const [commodities, setCommodities] = useState<any[]>([]);
@@ -687,6 +688,19 @@ export default function WholesalerPage() {
       {/* WHOLESALER NAVIGATION TABS */}
       <div className="sticky top-14 z-30 bg-white border-b border-slate-200 shadow-xs">
         <div className="max-w-6xl mx-auto flex items-center justify-around px-2 py-1 overflow-x-auto no-scrollbar">
+          {/* TAB 0: EXECUTIVE DASHBOARD */}
+          <button
+            onClick={() => setActiveTab('dashboard')}
+            className={`flex-1 min-w-[110px] py-2.5 text-center text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-all ${
+              activeTab === 'dashboard'
+                ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <LayoutDashboard className="w-4 h-4" />
+            <span>Dashboard</span>
+          </button>
+
           {/* TAB: RETAILER APPROVALS */}
           <button
             onClick={() => setActiveTab('approvals')}
@@ -757,6 +771,443 @@ export default function WholesalerPage() {
           </button>
         </div>
       </div>
+
+      {/* TAB 0: EXECUTIVE WHOLESALER DASHBOARD */}
+      {activeTab === 'dashboard' && (
+        <main className="max-w-6xl mx-auto w-full px-3 sm:px-4 py-4 flex-1 space-y-6">
+          {/* Urgent Attention Alert Center */}
+          {(pendingRetailers.length > 0 ||
+            ordersSummary.lowStockSkus.length > 0 ||
+            orders.filter((o) => o.status === 'NEW').length > 0) && (
+            <div className="space-y-2.5">
+              {pendingRetailers.length > 0 && (
+                <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-xl bg-amber-500 text-white shadow-xs shrink-0">
+                      <UserCheck className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs sm:text-sm font-extrabold text-amber-950">
+                        {pendingRetailers.length} Kirana Store(s) Waiting For Access
+                      </h3>
+                      <p className="text-[11px] sm:text-xs text-amber-800">
+                        Approve their registration and assign credit limit so they can start ordering.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('approvals')}
+                    className="self-start sm:self-auto px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-xs transition-colors shrink-0"
+                  >
+                    Review & Set Credit Limits →
+                  </button>
+                </div>
+              )}
+
+              {orders.filter((o) => o.status === 'NEW').length > 0 && (
+                <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-blue-50 to-sky-50 border border-blue-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-xl bg-blue-600 text-white shadow-xs shrink-0">
+                      <Truck className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs sm:text-sm font-extrabold text-blue-950">
+                        {orders.filter((o) => o.status === 'NEW').length} New Order(s) Awaiting Packing & Dispatch
+                      </h3>
+                      <p className="text-[11px] sm:text-xs text-blue-800">
+                        Fresh orders received today from Kirana stores in your mandi zone.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('orders')}
+                    className="self-start sm:self-auto px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-colors shrink-0"
+                  >
+                    Pack & Dispatch →
+                  </button>
+                </div>
+              )}
+
+              {ordersSummary.lowStockSkus.length > 0 && (
+                <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-rose-50 to-pink-50 border border-rose-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-xl bg-rose-600 text-white shadow-xs shrink-0">
+                      <AlertTriangle className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs sm:text-sm font-extrabold text-rose-950">
+                        {ordersSummary.lowStockSkus.length} Godown SKU(s) Running Critically Low (&lt; 30 bags)
+                      </h3>
+                      <p className="text-[11px] sm:text-xs text-rose-800">
+                        {ordersSummary.lowStockSkus
+                          .slice(0, 3)
+                          .map((s) => `${s.brand} (${s.currentStock} left)`)
+                          .join(', ')}
+                        {ordersSummary.lowStockSkus.length > 3
+                          ? ` +${ordersSummary.lowStockSkus.length - 3} more`
+                          : ''}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInwardMode('single');
+                      setActiveTab('inward');
+                    }}
+                    className="self-start sm:self-auto px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition-colors shrink-0"
+                  >
+                    Restock Godown →
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Quick Operations Hub (6 Action Cards) */}
+          <div>
+            <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-3">
+              Quick Operations & Fast Access
+            </h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setInwardMode('single');
+                  setActiveTab('inward');
+                }}
+                className="p-3.5 rounded-2xl bg-white border border-slate-200 hover:border-emerald-500 hover:shadow-md transition-all text-left group"
+              >
+                <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold mb-2 group-hover:scale-110 transition-transform">
+                  <PackagePlus className="w-4 h-4 text-emerald-700" />
+                </div>
+                <div className="text-xs font-extrabold text-slate-900 group-hover:text-emerald-800">
+                  + Add Stock
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">Single inward</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setInwardMode('excel');
+                  setActiveTab('inward');
+                }}
+                className="p-3.5 rounded-2xl bg-white border border-slate-200 hover:border-emerald-500 hover:shadow-md transition-all text-left group"
+              >
+                <div className="w-8 h-8 rounded-xl bg-teal-100 text-teal-800 flex items-center justify-center font-bold mb-2 group-hover:scale-110 transition-transform">
+                  <FileSpreadsheet className="w-4 h-4 text-teal-700" />
+                </div>
+                <div className="text-xs font-extrabold text-slate-900 group-hover:text-emerald-800">
+                  Bulk Excel
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">Upload template</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('bhav')}
+                className="p-3.5 rounded-2xl bg-white border border-slate-200 hover:border-emerald-500 hover:shadow-md transition-all text-left group"
+              >
+                <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-800 flex items-center justify-center font-bold mb-2 group-hover:scale-110 transition-transform">
+                  <TrendingUp className="w-4 h-4 text-blue-700" />
+                </div>
+                <div className="text-xs font-extrabold text-slate-900 group-hover:text-emerald-800">
+                  Mandi Bhav
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">Update daily rates</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('orders')}
+                className="p-3.5 rounded-2xl bg-white border border-slate-200 hover:border-emerald-500 hover:shadow-md transition-all text-left group"
+              >
+                <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold mb-2 group-hover:scale-110 transition-transform">
+                  <Truck className="w-4 h-4 text-amber-700" />
+                </div>
+                <div className="text-xs font-extrabold text-slate-900 group-hover:text-emerald-800">
+                  Dispatch Orders
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">{orders.length} orders total</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('approvals')}
+                className="p-3.5 rounded-2xl bg-white border border-slate-200 hover:border-emerald-500 hover:shadow-md transition-all text-left group"
+              >
+                <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-800 flex items-center justify-center font-bold mb-2 group-hover:scale-110 transition-transform">
+                  <UserCheck className="w-4 h-4 text-purple-700" />
+                </div>
+                <div className="text-xs font-extrabold text-slate-900 group-hover:text-emerald-800">
+                  Store Approvals
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">{activeRetailers.length} active stores</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('khata')}
+                className="p-3.5 rounded-2xl bg-white border border-slate-200 hover:border-emerald-500 hover:shadow-md transition-all text-left group"
+              >
+                <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold mb-2 group-hover:scale-110 transition-transform">
+                  <BookOpen className="w-4 h-4 text-emerald-700" />
+                </div>
+                <div className="text-xs font-extrabold text-slate-900 group-hover:text-emerald-800">
+                  Kirana Khata
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">Ledger & Udhaar</div>
+              </button>
+            </div>
+          </div>
+
+          {/* Two-Column Analytics & Operational Feed */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left 2 Cols: Live Orders Stream */}
+            <div className="lg:col-span-2 space-y-4">
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-sm sm:text-base font-extrabold text-slate-900">
+                      Live Kirana Orders Feed
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Latest incoming purchase orders from connected Kirana stores
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('orders')}
+                    className="text-xs font-bold text-emerald-700 hover:text-emerald-800 hover:underline flex items-center gap-1"
+                  >
+                    <span>View All ({orders.length})</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {orders.length === 0 ? (
+                  <div className="p-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                    <p className="text-xs text-slate-500 font-medium">
+                      No orders received yet today. Connected Kiranas can order using their Mandi Matrix.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100">
+                    {orders.slice(0, 5).map((order) => {
+                      const statusColors: Record<string, string> = {
+                        NEW: 'bg-amber-100 text-amber-800 border-amber-200',
+                        PACKED: 'bg-blue-100 text-blue-800 border-blue-200',
+                        OUT_FOR_DELIVERY: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+                        DELIVERED: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+                      };
+                      return (
+                        <div
+                          key={order.id}
+                          className="py-3 sm:py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 hover:bg-slate-50/70 rounded-xl px-2 transition-colors"
+                        >
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <span className="text-xs font-extrabold text-slate-900">
+                                #{order.orderNumber}
+                              </span>
+                              <span
+                                className={`text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded-md border ${
+                                  statusColors[order.status] || 'bg-slate-100 text-slate-700'
+                                }`}
+                              >
+                                {order.status.replace(/_/g, ' ')}
+                              </span>
+                              <span className="text-[10px] text-slate-400">
+                                {new Date(order.createdAt).toLocaleTimeString('en-IN', {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-700 font-semibold truncate">
+                              {order.user?.shopName || order.user?.name}
+                              <span className="text-slate-400 font-normal">
+                                {' '}• {order.items?.length || 0} items ({order.totalBags} bags)
+                              </span>
+                            </p>
+                          </div>
+
+                          <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+                            <span className="text-xs sm:text-sm font-black text-slate-900">
+                              ₹{order.totalAmount.toLocaleString('en-IN')}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setActiveTab('orders')}
+                              className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-emerald-100 hover:text-emerald-800 text-slate-700 text-xs font-bold transition-colors"
+                            >
+                              Manage →
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Market Udhaar Exposure Snapshot */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h3 className="text-sm font-extrabold text-slate-900">
+                      Kirana Market Udhaar Snapshot
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Total Market Receivables:{' '}
+                      <strong className="text-emerald-700">
+                        ₹{totalMarketUdhaar.toLocaleString('en-IN')}
+                      </strong>{' '}
+                      across {khataSummary.length} stores
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('khata')}
+                    className="text-xs font-bold text-emerald-700 hover:underline"
+                  >
+                    Open Full Khata →
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  {khataSummary.slice(0, 3).map((item) => (
+                    <div
+                      key={item.user.id}
+                      className="p-3 rounded-xl bg-slate-50 border border-slate-200/80"
+                    >
+                      <div className="text-xs font-bold text-slate-900 truncate mb-1">
+                        {item.user.shopName}
+                      </div>
+                      <div className="flex items-center justify-between text-[11px] text-slate-500 mb-1">
+                        <span>Balance:</span>
+                        <span className="font-extrabold text-rose-700">
+                          ₹{item.balance.toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] text-slate-400">
+                        <span>Limit: ₹{item.user.creditLimit.toLocaleString('en-IN')}</span>
+                        <span className="text-emerald-700 font-semibold">{item.user.phoneNumber}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Right 1 Col: Godown Inventory & Low Stock */}
+            <div className="space-y-4">
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h3 className="text-sm font-extrabold text-slate-900">
+                      Godown Inventory Health
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      {flatSkus.length} SKUs • {flatSkus.reduce((sum, s) => sum + s.currentStock, 0)} Total Bags
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInwardMode('single');
+                      setActiveTab('inward');
+                    }}
+                    className="text-xs font-bold text-emerald-700 hover:underline"
+                  >
+                    + Inward
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {ordersSummary.lowStockSkus.length > 0 && (
+                    <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200">
+                      <span className="text-[10px] font-black uppercase text-rose-800 tracking-wider block mb-1">
+                        🚨 Critical Low Stock Alert ({ordersSummary.lowStockSkus.length})
+                      </span>
+                      <div className="space-y-1.5">
+                        {ordersSummary.lowStockSkus.slice(0, 3).map((sku) => (
+                          <div
+                            key={sku.id}
+                            className="flex items-center justify-between text-xs font-semibold text-rose-900"
+                          >
+                            <span className="truncate max-w-[140px]">{sku.brand}</span>
+                            <span className="font-black">{sku.currentStock} bags</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="divide-y divide-slate-100">
+                    {flatSkus.slice(0, 5).map((sku) => {
+                      const pct = Math.min(100, Math.round((sku.currentStock / 150) * 100));
+                      return (
+                        <div key={sku.id} className="py-2.5">
+                          <div className="flex items-center justify-between text-xs mb-1">
+                            <span className="font-bold text-slate-900 truncate max-w-[160px]">
+                              {sku.brand} ({sku.packagingType})
+                            </span>
+                            <span className="font-extrabold text-emerald-700 shrink-0">
+                              {sku.currentStock} bags
+                            </span>
+                          </div>
+                          <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full ${
+                                sku.currentStock < 30 ? 'bg-rose-500' : 'bg-emerald-600'
+                              }`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('bhav')}
+                    className="w-full py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold text-center transition-colors"
+                  >
+                    View All Commodities & Rates →
+                  </button>
+                </div>
+              </div>
+
+              {/* Connected Stores Quick Info */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-extrabold text-slate-900">
+                    Connected Kirana Stores
+                  </span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                    {activeRetailers.length} Active
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 mb-3">
+                  Kirana stores authorized to purchase from your mandi depot.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('approvals')}
+                  className="w-full py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-800 text-xs font-bold text-center border border-purple-200 transition-colors"
+                >
+                  Manage Kirana Store Access →
+                </button>
+              </div>
+            </div>
+          </div>
+        </main>
+      )}
 
       {/* TAB: RETAILER APPROVALS & ACCESS CONTROL (USER REQUIREMENT) */}
       {activeTab === 'approvals' && (

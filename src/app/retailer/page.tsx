@@ -24,6 +24,8 @@ import {
   Building2,
   Store,
   Phone,
+  LayoutDashboard,
+  Sparkles,
 } from 'lucide-react';
 
 interface SKU {
@@ -60,7 +62,7 @@ export default function RetailerPage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [selectedWholesalerId, setSelectedWholesalerId] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<'order' | 'repeat' | 'tracking' | 'khata'>('order');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'order' | 'repeat' | 'tracking' | 'khata'>('dashboard');
   const [categories, setCategories] = useState<Category[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCatId, setSelectedCatId] = useState<string>('all');
@@ -440,10 +442,22 @@ export default function RetailerPage() {
 
       {/* MOBILE-FIRST TAB NAVIGATION */}
       <div className="sticky top-14 z-30 bg-white border-b border-slate-200 shadow-xs">
-        <div className="max-w-6xl mx-auto flex items-center justify-around px-2 py-1">
+        <div className="max-w-6xl mx-auto flex items-center justify-around px-2 py-1 overflow-x-auto no-scrollbar">
+          <button
+            onClick={() => setActiveTab('dashboard')}
+            className={`flex-1 min-w-[100px] py-2.5 text-center text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-all ${
+              activeTab === 'dashboard'
+                ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <LayoutDashboard className="w-4 h-4" />
+            <span>Dashboard</span>
+          </button>
+
           <button
             onClick={() => setActiveTab('order')}
-            className={`flex-1 py-2.5 text-center text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-all ${
+            className={`flex-1 min-w-[110px] py-2.5 text-center text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-all ${
               activeTab === 'order'
                 ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -455,7 +469,7 @@ export default function RetailerPage() {
 
           <button
             onClick={() => setActiveTab('repeat')}
-            className={`flex-1 py-2.5 text-center text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-all ${
+            className={`flex-1 min-w-[110px] py-2.5 text-center text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-all ${
               activeTab === 'repeat'
                 ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -467,7 +481,7 @@ export default function RetailerPage() {
 
           <button
             onClick={() => setActiveTab('tracking')}
-            className={`flex-1 py-2.5 text-center text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-all relative ${
+            className={`flex-1 min-w-[100px] py-2.5 text-center text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-all relative ${
               activeTab === 'tracking'
                 ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -482,7 +496,7 @@ export default function RetailerPage() {
 
           <button
             onClick={() => setActiveTab('khata')}
-            className={`flex-1 py-2.5 text-center text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-all ${
+            className={`flex-1 min-w-[100px] py-2.5 text-center text-xs font-bold border-b-2 flex items-center justify-center gap-1.5 transition-all ${
               activeTab === 'khata'
                 ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -493,6 +507,317 @@ export default function RetailerPage() {
           </button>
         </div>
       </div>
+
+      {/* TAB 0: KIRANA STORE OVERVIEW DASHBOARD */}
+      {activeTab === 'dashboard' && (
+        <main className="max-w-6xl mx-auto w-full px-3 sm:px-4 py-4 flex-1 space-y-6">
+          {/* Active Order Alert Card (If In-Flight) */}
+          {orders.filter((o) => o.status !== 'DELIVERED').length > 0 ? (
+            <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 text-white shadow-md">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="p-2.5 rounded-xl bg-white/20 backdrop-blur shrink-0">
+                    <Truck className="w-6 h-6 text-white animate-bounce" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-black uppercase tracking-wider text-emerald-200">
+                        In-Transit Mandi Delivery
+                      </span>
+                      <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-amber-400 text-slate-950">
+                        {orders.find((o) => o.status !== 'DELIVERED')?.status.replace(/_/g, ' ')}
+                      </span>
+                    </div>
+                    <h3 className="text-sm sm:text-base font-extrabold">
+                      Order #{orders.find((o) => o.status !== 'DELIVERED')?.orderNumber} (
+                      {orders.find((o) => o.status !== 'DELIVERED')?.totalBags} Bags • ₹
+                      {orders.find((o) => o.status !== 'DELIVERED')?.totalAmount.toLocaleString('en-IN')})
+                    </h3>
+                    {orders.find((o) => o.status !== 'DELIVERED')?.driverName && (
+                      <p className="text-xs text-emerald-100 mt-0.5">
+                        Assigned Tempo:{' '}
+                        <strong>{orders.find((o) => o.status !== 'DELIVERED')?.vehicleNumber}</strong> • Driver:{' '}
+                        <strong>{orders.find((o) => o.status !== 'DELIVERED')?.driverName}</strong>
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('tracking')}
+                  className="self-start sm:self-auto px-4 py-2 rounded-xl bg-white text-emerald-800 text-xs font-extrabold shadow-sm hover:bg-emerald-50 transition-colors shrink-0"
+                >
+                  Live Delivery Status →
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-emerald-600 text-white shadow-xs shrink-0">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-xs sm:text-sm font-extrabold text-emerald-950">
+                    All Mandi Deliveries Complete!
+                  </h3>
+                  <p className="text-[11px] sm:text-xs text-emerald-700">
+                    Your stock is refreshed. Morning Mandi Bhav rates are updated for today&apos;s orders.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveTab('order')}
+                className="self-start sm:self-auto px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-colors shrink-0"
+              >
+                Place New Order →
+              </button>
+            </div>
+          )}
+
+          {/* Quick Operations Hub (4 Action Cards) */}
+          <div>
+            <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-3">
+              Kirana Store Quick Actions
+            </h2>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <button
+                type="button"
+                onClick={() => setActiveTab('order')}
+                className="p-4 rounded-2xl bg-white border border-slate-200 hover:border-emerald-500 hover:shadow-md transition-all text-left group"
+              >
+                <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold mb-2.5 group-hover:scale-110 transition-transform">
+                  <Wheat className="w-5 h-5 text-emerald-700" />
+                </div>
+                <div className="text-xs sm:text-sm font-extrabold text-slate-900 group-hover:text-emerald-800">
+                  Mandi Matrix
+                </div>
+                <div className="text-[11px] text-slate-400 mt-0.5">Order Rice, Dal, Oil, Atta</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('repeat')}
+                className="p-4 rounded-2xl bg-white border border-slate-200 hover:border-emerald-500 hover:shadow-md transition-all text-left group"
+              >
+                <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-800 flex items-center justify-center font-bold mb-2.5 group-hover:scale-110 transition-transform">
+                  <RotateCcw className="w-5 h-5 text-blue-700" />
+                </div>
+                <div className="text-xs sm:text-sm font-extrabold text-slate-900 group-hover:text-emerald-800">
+                  1-Click Repeat
+                </div>
+                <div className="text-[11px] text-slate-400 mt-0.5">Quick staple reorder</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('tracking')}
+                className="p-4 rounded-2xl bg-white border border-slate-200 hover:border-emerald-500 hover:shadow-md transition-all text-left group"
+              >
+                <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold mb-2.5 group-hover:scale-110 transition-transform">
+                  <Truck className="w-5 h-5 text-amber-700" />
+                </div>
+                <div className="text-xs sm:text-sm font-extrabold text-slate-900 group-hover:text-emerald-800">
+                  Live Tracking
+                </div>
+                <div className="text-[11px] text-slate-400 mt-0.5">{orders.length} orders history</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('khata')}
+                className="p-4 rounded-2xl bg-white border border-slate-200 hover:border-emerald-500 hover:shadow-md transition-all text-left group"
+              >
+                <div className="w-9 h-9 rounded-xl bg-purple-100 text-purple-800 flex items-center justify-center font-bold mb-2.5 group-hover:scale-110 transition-transform">
+                  <BookOpen className="w-5 h-5 text-purple-700" />
+                </div>
+                <div className="text-xs sm:text-sm font-extrabold text-slate-900 group-hover:text-emerald-800">
+                  Bahi-Khata Ledger
+                </div>
+                <div className="text-[11px] text-slate-400 mt-0.5">
+                  ₹{khata ? khata.currentBalance.toLocaleString('en-IN') : '0'} udhaar balance
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* Two-Column Overview Section */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left 2 Cols: Morning Mandi Bhav Ticker Highlights */}
+            <div className="lg:col-span-2 space-y-4">
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-sm sm:text-base font-extrabold text-slate-900">
+                      Today&apos;s Mandi Bhav Ticker
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Current rates from{' '}
+                      <strong>{activeConnection?.wholesaler?.shopName || 'Connected Wholesaler'}</strong>
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('order')}
+                    className="text-xs font-bold text-emerald-700 hover:underline flex items-center gap-1"
+                  >
+                    <span>Full Matrix</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {categories.slice(0, 4).map((cat) => {
+                    const sampleSku = cat.varieties[0]?.skus[0];
+                    if (!sampleSku) return null;
+                    return (
+                      <div
+                        key={cat.id}
+                        className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-3 hover:bg-emerald-50/40 transition-colors"
+                      >
+                        <div className="min-w-0">
+                          <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded bg-slate-200 text-slate-700">
+                            {cat.name}
+                          </span>
+                          <p className="text-xs font-extrabold text-slate-900 truncate mt-1">
+                            {cat.varieties[0]?.name}
+                          </p>
+                          <p className="text-[11px] text-slate-500">
+                            {sampleSku.brand} ({sampleSku.packagingType})
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="text-[10px] text-slate-400 block">Mandi Bhav</span>
+                          <span className="text-xs sm:text-sm font-black text-emerald-800">
+                            ₹{sampleSku.sellingPrice.toLocaleString('en-IN')}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedCatId(cat.id);
+                              setActiveTab('order');
+                            }}
+                            className="text-[10px] font-bold text-emerald-700 hover:underline block mt-0.5"
+                          >
+                            + Order
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Recent Orders History */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-extrabold text-slate-900">Recent Mandi Orders</h3>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('tracking')}
+                    className="text-xs font-bold text-emerald-700 hover:underline"
+                  >
+                    View All Orders →
+                  </button>
+                </div>
+
+                {orders.length === 0 ? (
+                  <p className="text-xs text-slate-500 p-4 text-center">
+                    No past orders yet. Place your first mandi stock replenishment above!
+                  </p>
+                ) : (
+                  <div className="divide-y divide-slate-100">
+                    {orders.slice(0, 3).map((order) => (
+                      <div
+                        key={order.id}
+                        className="py-3 flex items-center justify-between gap-3 text-xs"
+                      >
+                        <div>
+                          <span className="font-extrabold text-slate-900">#{order.orderNumber}</span>
+                          <span className="text-slate-400 ml-2">
+                            {new Date(order.createdAt).toLocaleDateString('en-IN')}
+                          </span>
+                          <p className="text-slate-500 text-[11px]">
+                            {order.items?.length || 0} commodities • {order.totalBags} bags
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-black text-slate-900 block">
+                            ₹{order.totalAmount.toLocaleString('en-IN')}
+                          </span>
+                          <span className="text-[10px] font-bold text-emerald-700 uppercase">
+                            {order.status}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right 1 Col: Bahi-Khata & Credit Balance Card */}
+            <div className="space-y-4">
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-xs">
+                <h3 className="text-sm font-extrabold text-slate-900 mb-1">
+                  Credit & Udhaar Ledger
+                </h3>
+                <p className="text-xs text-slate-500 mb-4">
+                  {activeConnection?.wholesaler?.shopName || 'Connected Wholesaler'}
+                </p>
+
+                <div className="space-y-3">
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                    <span className="text-[10px] text-slate-500 font-medium block">
+                      Total Credit Limit
+                    </span>
+                    <span className="text-base font-black text-slate-900">
+                      ₹{activeConnection ? activeConnection.creditLimit.toLocaleString('en-IN') : '0'}
+                    </span>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
+                    <span className="text-[10px] text-emerald-700 font-medium block">
+                      Available Credit to Order
+                    </span>
+                    <span className="text-base font-black text-emerald-800">
+                      ₹{khata ? khata.availableCredit.toLocaleString('en-IN') : '0'}
+                    </span>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-amber-50 border border-amber-200">
+                    <span className="text-[10px] text-amber-700 font-medium block">
+                      Outstanding Wholesaler Udhaar
+                    </span>
+                    <span className="text-base font-black text-amber-900">
+                      ₹{khata ? khata.currentBalance.toLocaleString('en-IN') : '0'}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setPayModalOpen(true)}
+                    className="w-full py-2.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-extrabold text-center shadow-xs transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <CreditCard className="w-4 h-4" />
+                    <span>Settle / Pay Udhaar Balance</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('khata')}
+                    className="w-full py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold text-center transition-colors"
+                  >
+                    View Ledger Statement →
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+      )}
 
       {/* TAB 1: MANDI QUICK-ORDER MATRIX (THE CORE FEATURE) */}
       {activeTab === 'order' && (
