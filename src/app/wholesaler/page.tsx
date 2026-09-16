@@ -22,7 +22,16 @@ import {
   Users,
   XCircle,
   ShieldAlert,
+  FileSpreadsheet,
+  Download,
+  UploadCloud,
+  FileUp,
+  X,
+  ChevronDown,
+  Layers,
+  Sparkles,
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 interface SKU {
   id: string;
@@ -35,6 +44,7 @@ interface SKU {
   variety: {
     id: string;
     name: string;
+    subType?: string | null;
     category: {
       id: string;
       name: string;
@@ -52,6 +62,13 @@ export default function WholesalerPage() {
   const [flatSkus, setFlatSkus] = useState<SKU[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Inward Mode: 'single' | 'excel'
+  const [inwardMode, setInwardMode] = useState<'single' | 'excel'>('single');
+
+  // Searchable Combobox State for Single Inward
+  const [skuSearchText, setSkuSearchText] = useState('');
+  const [isSkuDropdownOpen, setIsSkuDropdownOpen] = useState(false);
+
   // Fast Stock Inward Form State
   const [selectedSkuId, setSelectedSkuId] = useState<string>('');
   const [inwardBags, setInwardBags] = useState<number | ''>('');
@@ -60,6 +77,28 @@ export default function WholesalerPage() {
   const [supplierName, setSupplierName] = useState<string>('');
   const [inwardSubmitting, setInwardSubmitting] = useState(false);
   const [inwardSuccessMsg, setInwardSuccessMsg] = useState('');
+
+  // Add New Commodity / SKU Modal State
+  const [isNewSkuModalOpen, setIsNewSkuModalOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newVarietyName, setNewVarietyName] = useState('');
+  const [newSubType, setNewSubType] = useState('');
+  const [newBrand, setNewBrand] = useState('');
+  const [newPackagingType, setNewPackagingType] = useState('25kg Bag');
+  const [newWeightKg, setNewWeightKg] = useState('25');
+  const [newInitialStock, setNewInitialStock] = useState('100');
+  const [newPurchaseCost, setNewPurchaseCost] = useState('');
+  const [newSellingPrice, setNewSellingPrice] = useState('');
+  const [newSupplier, setNewSupplier] = useState('');
+  const [creatingSku, setCreatingSku] = useState(false);
+  const [newSkuError, setNewSkuError] = useState('');
+
+  // Bulk Excel Inward State
+  const [excelFile, setExcelFile] = useState<File | null>(null);
+  const [parsedExcelRows, setParsedExcelRows] = useState<any[]>([]);
+  const [excelProcessing, setExcelProcessing] = useState(false);
+  const [excelSuccessMsg, setExcelSuccessMsg] = useState('');
+  const [excelErrorMsg, setExcelErrorMsg] = useState('');
 
   // Orders State
   const [orders, setOrders] = useState<any[]>([]);
@@ -160,6 +199,281 @@ export default function WholesalerPage() {
     if (sku) {
       setPurchaseCost(sku.purchaseCost.toString());
       setSellingBhav(sku.sellingPrice.toString());
+    }
+  };
+
+  // Filtered SKUs for Searchable Combobox
+  const filteredComboboxSkus = useMemo(() => {
+    if (!skuSearchText.trim()) return flatSkus;
+    const q = skuSearchText.toLowerCase();
+    return flatSkus.filter((sku) => {
+      return (
+        sku.brand.toLowerCase().includes(q) ||
+        sku.packagingType.toLowerCase().includes(q) ||
+        sku.variety.name.toLowerCase().includes(q) ||
+        (sku.variety.subType && sku.variety.subType.toLowerCase().includes(q)) ||
+        sku.variety.category.name.toLowerCase().includes(q)
+      );
+    });
+  }, [flatSkus, skuSearchText]);
+
+  const selectedSkuObject = useMemo(() => {
+    return flatSkus.find((s) => s.id === selectedSkuId) || flatSkus[0] || null;
+  }, [flatSkus, selectedSkuId]);
+
+  const handleSelectComboboxSku = (sku: SKU) => {
+    setSelectedSkuId(sku.id);
+    setPurchaseCost(sku.purchaseCost.toString());
+    setSellingBhav(sku.sellingPrice.toString());
+    setSkuSearchText('');
+    setIsSkuDropdownOpen(false);
+  };
+
+  // Create New Commodity / SKU Modal Submission
+  const handleCreateNewSkuSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCategoryName.trim() || !newVarietyName.trim() || !newBrand.trim() || !newPackagingType.trim()) {
+      setNewSkuError('Please fill category, variety, brand, and packaging');
+      return;
+    }
+
+    const cost = parseFloat(newPurchaseCost);
+    const price = parseFloat(newSellingPrice);
+    const weight = parseFloat(newWeightKg);
+    const stock = parseInt(newInitialStock || '0', 10);
+
+    if (isNaN(cost) || cost <= 0 || isNaN(price) || price <= 0 || isNaN(weight) || weight <= 0) {
+      setNewSkuError('Valid purchase cost, selling rate, and weight are required');
+      return;
+    }
+
+    setCreatingSku(true);
+    setNewSkuError('');
+
+    try {
+      const res = await fetch('/api/inventory/new-sku', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          categoryName: newCategoryName.trim(),
+          varietyName: newVarietyName.trim(),
+          subType: newSubType.trim(),
+          brand: newBrand.trim(),
+          packagingType: newPackagingType.trim(),
+          weightKg: weight,
+          initialStock: stock,
+          purchaseCost: cost,
+          sellingPrice: price,
+          supplier: newSupplier.trim(),
+          wholesalerId: user?.id,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to create new commodity SKU');
+      }
+
+      setIsNewSkuModalOpen(false);
+      setInwardSuccessMsg(`New commodity "${data.sku.brand} (${data.sku.packagingType})" created and added to godown stock!`);
+      // Reset modal fields
+      setNewVarietyName('');
+      setNewSubType('');
+      setNewBrand('');
+      setNewPurchaseCost('');
+      setNewSellingPrice('');
+      setNewSupplier('');
+
+      // Refresh data and select new sku
+      await refreshAllData(user?.id);
+      setSelectedSkuId(data.sku.id);
+      setPurchaseCost(data.sku.purchaseCost.toString());
+      setSellingBhav(data.sku.sellingPrice.toString());
+    } catch (err: any) {
+      setNewSkuError(err.message);
+    } finally {
+      setCreatingSku(false);
+    }
+  };
+
+  // Download Excel / CSV Template for Bulk Inward
+  const handleDownloadTemplate = (format: 'xlsx' | 'csv' = 'xlsx') => {
+    const templateData = [
+      {
+        Category: 'Rice (Chawal)',
+        Variety: 'Basmati Rice',
+        SubType: '1121 Extra Long',
+        Brand: 'Royal Crown Marka',
+        PackagingType: '25kg Bag',
+        WeightKg: 25,
+        BagsAdded: 100,
+        PurchaseCost: 2450,
+        SellingPrice: 2600,
+        Supplier: 'Laxmi Agro Rice Mill',
+        Notes: 'Fresh Mandi lot',
+      },
+      {
+        Category: 'Atta, Maida & Suji',
+        Variety: 'Wheat Atta (Gehu Chawal)',
+        SubType: 'MP Sharbati Chakki',
+        Brand: 'Shree Chakki Fresh Atta',
+        PackagingType: '50kg Bag',
+        WeightKg: 50,
+        BagsAdded: 150,
+        PurchaseCost: 1550,
+        SellingPrice: 1680,
+        Supplier: 'MP Roller Flour Mills',
+        Notes: 'Chakki ground',
+      },
+      {
+        Category: 'Edible Oils & Ghee',
+        Variety: 'Refined Sunflower Oil',
+        SubType: 'Triple Filtered',
+        Brand: 'Fortune Sunlite 15L',
+        PackagingType: '15L Tin',
+        WeightKg: 13.5,
+        BagsAdded: 80,
+        PurchaseCost: 1620,
+        SellingPrice: 1710,
+        Supplier: 'Adani Wilmar Depot',
+        Notes: 'Factory sealed tins',
+      },
+      {
+        Category: 'Pulses & Dal (Dalen)',
+        Variety: 'Toor / Arhar Dal',
+        SubType: 'Desi Fatka Unpolished',
+        Brand: 'Kisan Fatka Toor Dal',
+        PackagingType: '30kg Bag',
+        WeightKg: 30,
+        BagsAdded: 120,
+        PurchaseCost: 4150,
+        SellingPrice: 4400,
+        Supplier: 'Latur Dal Mill Association',
+        Notes: 'Unpolished bold grain',
+      },
+      {
+        Category: 'Sugar & Jaggery (Shakkar)',
+        Variety: 'Crystal White Sugar',
+        SubType: 'M-30 Grade',
+        Brand: 'Co-op Super Sugar',
+        PackagingType: '50kg Bag',
+        WeightKg: 50,
+        BagsAdded: 200,
+        PurchaseCost: 1890,
+        SellingPrice: 1980,
+        Supplier: 'Kolhapur Sugar Mill',
+        Notes: 'Grade M30 crystal',
+      },
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'StockInwardTemplate');
+
+    if (format === 'csv') {
+      XLSX.writeFile(workbook, 'mandi_stock_inward_template.csv', { bookType: 'csv' });
+    } else {
+      XLSX.writeFile(workbook, 'mandi_stock_inward_template.xlsx', { bookType: 'xlsx' });
+    }
+  };
+
+  // Handle Excel / CSV File Upload
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setExcelFile(file);
+    setExcelErrorMsg('');
+    setExcelSuccessMsg('');
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const workbook = XLSX.read(bstr, { type: 'binary' });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const rawJson: any[] = XLSX.utils.sheet_to_json(sheet);
+
+        if (!rawJson || rawJson.length === 0) {
+          setExcelErrorMsg('The uploaded file contains no data rows.');
+          return;
+        }
+
+        // Normalize headers flexibly
+        const parsed = rawJson.map((row) => {
+          const findKey = (candidates: string[]) => {
+            for (const key of Object.keys(row)) {
+              const cleanKey = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+              if (candidates.some((c) => cleanKey === c.toLowerCase().replace(/[^a-z0-9]/g, ''))) {
+                return row[key];
+              }
+            }
+            return '';
+          };
+
+          return {
+            category: findKey(['Category', 'Commodity', 'CategoryName']),
+            variety: findKey(['Variety', 'VarietyName', 'Item']),
+            subType: findKey(['SubType', 'Sub-Type', 'Type', 'Cut']),
+            brand: findKey(['Brand', 'BrandName', 'Marka']),
+            packagingType: findKey(['PackagingType', 'Packaging', 'Packing']),
+            weightKg: parseFloat(findKey(['WeightKg', 'Weight', 'Kg']) || '25'),
+            bagsAdded: parseInt(findKey(['BagsAdded', 'Bags', 'Quantity', 'Qty']) || '0', 10),
+            purchaseCost: parseFloat(findKey(['PurchaseCost', 'Cost', 'CostPrice', 'BuyingRate']) || '0'),
+            sellingPrice: parseFloat(findKey(['SellingPrice', 'Price', 'SellingRate', 'MandiBhav', 'Bhav']) || '0'),
+            supplier: findKey(['Supplier', 'Mill', 'Vendor']),
+            notes: findKey(['Notes', 'Remarks']),
+          };
+        });
+
+        const validRows = parsed.filter(
+          (r) => r.category && r.variety && r.brand && r.packagingType && r.bagsAdded > 0
+        );
+
+        if (validRows.length === 0) {
+          setExcelErrorMsg('No valid rows found. Please check column headers against the template.');
+          return;
+        }
+
+        setParsedExcelRows(validRows);
+      } catch (err: any) {
+        setExcelErrorMsg(`Failed to parse file: ${err.message}`);
+      }
+    };
+
+    reader.readAsBinaryString(file);
+  };
+
+  // Submit Bulk Inward from Excel
+  const handleConfirmBulkInward = async () => {
+    if (parsedExcelRows.length === 0 || !user) return;
+
+    setExcelProcessing(true);
+    setExcelErrorMsg('');
+    try {
+      const res = await fetch('/api/inventory/bulk-inward', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          wholesalerId: user.id,
+          items: parsedExcelRows,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to process bulk inward');
+      }
+
+      setExcelSuccessMsg(data.message);
+      setParsedExcelRows([]);
+      setExcelFile(null);
+      await refreshAllData(user.id);
+    } catch (err: any) {
+      setExcelErrorMsg(err.message);
+    } finally {
+      setExcelProcessing(false);
     }
   };
 
@@ -587,137 +901,525 @@ export default function WholesalerPage() {
         </main>
       )}
 
-      {/* TAB 1: FAST STOCK INWARD */}
+      {/* TAB 1: FAST STOCK INWARD & BULK EXCEL */}
       {activeTab === 'inward' && (
         <main className="max-w-4xl mx-auto w-full px-3 sm:px-4 py-4 flex-1">
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 shadow-xs mb-6">
-            <div className="mb-4">
-              <span className="text-[11px] font-bold text-emerald-700 uppercase bg-emerald-50 px-2 py-0.5 rounded">
-                Godown Inward Entry
-              </span>
-              <h2 className="text-base sm:text-lg font-extrabold text-slate-900 mt-1">
-                Fast Stock Inward & Landing Cost Updater
-              </h2>
-              <p className="text-xs text-slate-500">
-                Quickly record incoming bags/tins from trucks or mills. Saves immediately to MySQL.
-              </p>
-            </div>
+          {/* Mode Switcher Tabs */}
+          <div className="flex items-center gap-2 p-1 bg-slate-100 rounded-xl mb-5 max-w-md">
+            <button
+              type="button"
+              onClick={() => setInwardMode('single')}
+              className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                inwardMode === 'single'
+                  ? 'bg-white text-emerald-800 shadow-xs border border-slate-200/80'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <PackagePlus className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Single Commodity Inward</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setInwardMode('excel')}
+              className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                inwardMode === 'excel'
+                  ? 'bg-white text-emerald-800 shadow-xs border border-slate-200/80'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Bulk Excel / CSV Upload</span>
+            </button>
+          </div>
 
-            {inwardSuccessMsg && (
-              <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                <span>{inwardSuccessMsg}</span>
-              </div>
-            )}
+          {/* MODE 1: SINGLE COMMODITY INWARD */}
+          {inwardMode === 'single' && (
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 shadow-xs mb-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+                <div>
+                  <span className="text-[11px] font-bold text-emerald-700 uppercase bg-emerald-50 px-2 py-0.5 rounded">
+                    Godown Inward Entry
+                  </span>
+                  <h2 className="text-base sm:text-lg font-extrabold text-slate-900 mt-1">
+                    Fast Stock Inward & Landing Cost Updater
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Search existing godown commodity or quickly add a new one on the fly.
+                  </p>
+                </div>
 
-            <form onSubmit={handleStockInwardSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  Select Commodity & Packaging
-                </label>
-                <select
-                  value={selectedSkuId}
-                  onChange={(e) => handleSkuSelectionChange(e.target.value)}
-                  className="w-full p-3 rounded-xl border border-slate-300 text-xs sm:text-sm font-semibold text-slate-900 bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (skuSearchText.trim()) {
+                      setNewBrand(skuSearchText.trim());
+                      setNewVarietyName(skuSearchText.trim());
+                    }
+                    setIsNewSkuModalOpen(true);
+                  }}
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-200 transition-colors shrink-0 shadow-xs"
                 >
-                  {flatSkus.map((sku) => (
-                    <option key={sku.id} value={sku.id}>
-                      {sku.variety.category.name} › {sku.variety.name} — {sku.brand} (
-                      {sku.packagingType}) [Godown Stock: {sku.currentStock} bags]
-                    </option>
-                  ))}
-                </select>
+                  <Plus className="w-4 h-4 text-emerald-600" />
+                  <span>+ Add New Commodity / SKU</span>
+                </button>
               </div>
 
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-bold text-slate-700">Quantity to Add (+ Bags)</label>
-                  <div className="flex items-center gap-1.5">
-                    {[25, 50, 100, 200].map((quickVal) => (
+              {inwardSuccessMsg && (
+                <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>{inwardSuccessMsg}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleStockInwardSubmit} className="space-y-4">
+                {/* Searchable Combobox */}
+                <div className="relative">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-bold text-slate-700">
+                      Search Commodity & Packaging
+                    </label>
+                    <span className="text-[11px] text-slate-400 font-medium">
+                      {flatSkus.length} commodities available
+                    </span>
+                  </div>
+
+                  {/* Search Input Box */}
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                      <Search className="w-4 h-4" />
+                    </div>
+                    <input
+                      type="text"
+                      value={skuSearchText}
+                      onFocus={() => setIsSkuDropdownOpen(true)}
+                      onChange={(e) => {
+                        setSkuSearchText(e.target.value);
+                        setIsSkuDropdownOpen(true);
+                      }}
+                      placeholder="Type to search (e.g. Basmati, Atta, Fortune, 25kg, Sugar)..."
+                      className="w-full pl-9 pr-10 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-semibold text-slate-900 bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+                    />
+                    {skuSearchText ? (
                       <button
                         type="button"
-                        key={quickVal}
-                        onClick={() => setInwardBags(quickVal)}
-                        className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 hover:bg-emerald-100 hover:text-emerald-800 text-slate-600 transition-colors"
+                        onClick={() => setSkuSearchText('')}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
                       >
-                        +{quickVal}
+                        <X className="w-4 h-4" />
                       </button>
-                    ))}
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setIsSkuDropdownOpen(!isSkuDropdownOpen)}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+                      >
+                        <ChevronDown className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Selected SKU Highlight Card */}
+                  {selectedSkuObject && (
+                    <div className="mt-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 shrink-0">
+                          {selectedSkuObject.variety.category.name}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-slate-900 truncate">
+                            {selectedSkuObject.brand} — {selectedSkuObject.variety.name}{' '}
+                            <span className="text-slate-500 font-normal">
+                              ({selectedSkuObject.packagingType})
+                            </span>
+                          </p>
+                          <p className="text-[11px] text-slate-500">
+                            Current Godown Stock:{' '}
+                            <span className="font-bold text-slate-800">
+                              {selectedSkuObject.currentStock} bags
+                            </span>{' '}
+                            • Cost: ₹{selectedSkuObject.purchaseCost} • Bhav: ₹{selectedSkuObject.sellingPrice}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsSkuDropdownOpen(true)}
+                        className="text-[11px] font-bold text-emerald-700 hover:text-emerald-800 hover:underline px-2 py-1 shrink-0"
+                      >
+                        Change Commodity
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Floating Combobox Dropdown */}
+                  {isSkuDropdownOpen && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-20"
+                        onClick={() => setIsSkuDropdownOpen(false)}
+                      />
+                      <div className="absolute z-30 w-full mt-1.5 bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden max-h-80 flex flex-col">
+                        <div className="p-2 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                          <span>
+                            {filteredComboboxSkus.length} matching commodities
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setIsSkuDropdownOpen(false)}
+                            className="text-slate-400 hover:text-slate-600 font-bold"
+                          >
+                            Close
+                          </button>
+                        </div>
+
+                        <div className="overflow-y-auto divide-y divide-slate-100 flex-1">
+                          {filteredComboboxSkus.length > 0 ? (
+                            filteredComboboxSkus.map((sku) => {
+                              const isSelected = sku.id === selectedSkuId;
+                              return (
+                                <button
+                                  key={sku.id}
+                                  type="button"
+                                  onClick={() => handleSelectComboboxSku(sku)}
+                                  className={`w-full p-2.5 text-left flex items-center justify-between gap-2 hover:bg-emerald-50 transition-colors ${
+                                    isSelected ? 'bg-emerald-50/70' : ''
+                                  }`}
+                                >
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5 mb-0.5">
+                                      <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded bg-slate-100 text-slate-600">
+                                        {sku.variety.category.name}
+                                      </span>
+                                      <span className="text-xs font-bold text-slate-900 truncate">
+                                        {sku.brand} — {sku.variety.name}
+                                      </span>
+                                    </div>
+                                    <div className="text-[11px] text-slate-500">
+                                      Pack: <span className="font-semibold text-slate-700">{sku.packagingType}</span> ({sku.weightKg} kg)
+                                    </div>
+                                  </div>
+                                  <div className="text-right shrink-0">
+                                    <span className="text-[10px] text-slate-400 block">Stock</span>
+                                    <span className="text-xs font-extrabold text-emerald-700">
+                                      {sku.currentStock} bags
+                                    </span>
+                                  </div>
+                                </button>
+                              );
+                            })
+                          ) : (
+                            <div className="p-4 text-center">
+                              <p className="text-xs font-semibold text-slate-600 mb-1">
+                                No commodities matching &quot;{skuSearchText}&quot;
+                              </p>
+                              <p className="text-[11px] text-slate-400 mb-3">
+                                You can add it as a new commodity to your godown right now.
+                              </p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Dropdown Footer: Always accessible + Add New Button */}
+                        <div className="p-2 bg-slate-50 border-t border-slate-200">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (skuSearchText.trim()) {
+                                setNewBrand(skuSearchText.trim());
+                                setNewVarietyName(skuSearchText.trim());
+                              }
+                              setIsSkuDropdownOpen(false);
+                              setIsNewSkuModalOpen(true);
+                            }}
+                            className="w-full py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs transition-colors"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>+ Add &quot;{skuSearchText || 'New Commodity'}&quot; to Godown</span>
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Bags Quantity */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-bold text-slate-700">Quantity to Add (+ Bags)</label>
+                    <div className="flex items-center gap-1.5">
+                      {[25, 50, 100, 200, 500].map((quickVal) => (
+                        <button
+                          type="button"
+                          key={quickVal}
+                          onClick={() => setInwardBags(quickVal)}
+                          className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 hover:bg-emerald-100 hover:text-emerald-800 text-slate-600 transition-colors"
+                        >
+                          +{quickVal}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <input
+                    type="number"
+                    min="1"
+                    value={inwardBags}
+                    onChange={(e) => setInwardBags(parseInt(e.target.value) || '')}
+                    placeholder="Enter bags / units count"
+                    className="w-full p-2.5 rounded-xl border border-slate-300 text-slate-900 text-sm font-bold focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+                    required
+                  />
+                </div>
+
+                {/* Purchase Cost & Selling Price */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Purchase / Landing Cost (₹/bag)
+                    </label>
+                    <input
+                      type="number"
+                      value={purchaseCost}
+                      onChange={(e) => setPurchaseCost(e.target.value)}
+                      placeholder="Enter purchase cost"
+                      className="w-full p-2.5 rounded-xl border border-slate-300 text-slate-900 text-sm font-semibold focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+                    />
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">
+                      Wholesaler mill buying price
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Selling Mandi Bhav (₹/bag)
+                    </label>
+                    <input
+                      type="number"
+                      value={sellingBhav}
+                      onChange={(e) => setSellingBhav(e.target.value)}
+                      placeholder="Enter selling rate"
+                      className="w-full p-2.5 rounded-xl border border-slate-300 text-slate-900 text-sm font-bold text-emerald-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+                    />
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">
+                      Rate Kiranas will see & order at
+                    </span>
                   </div>
                 </div>
-                <input
-                  type="number"
-                  min="1"
-                  value={inwardBags}
-                  onChange={(e) => setInwardBags(parseInt(e.target.value) || 0)}
-                  placeholder="Enter bags count"
-                  className="w-full p-2.5 rounded-xl border border-slate-300 text-slate-900 text-sm font-bold focus:ring-2 focus:ring-emerald-600 focus:outline-none"
-                />
-              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Supplier / Mill Name */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Purchase / Landing Cost (₹/bag)
+                    Supplier / Mill Name
                   </label>
                   <input
-                    type="number"
-                    value={purchaseCost}
-                    onChange={(e) => setPurchaseCost(e.target.value)}
-                    placeholder="Enter purchase cost"
-                    className="w-full p-2.5 rounded-xl border border-slate-300 text-slate-900 text-sm font-semibold focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+                    type="text"
+                    value={supplierName}
+                    onChange={(e) => setSupplierName(e.target.value)}
+                    placeholder="e.g. Laxmi Agro Mill, MP Depot, Wilmar"
+                    className="w-full p-2.5 rounded-xl border border-slate-300 text-slate-900 text-xs sm:text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none"
                   />
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">
-                    Wholesaler mill buying price
-                  </span>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Selling Mandi Bhav (₹/bag)
-                  </label>
-                  <input
-                    type="number"
-                    value={sellingBhav}
-                    onChange={(e) => setSellingBhav(e.target.value)}
-                    placeholder="Enter selling rate"
-                    className="w-full p-2.5 rounded-xl border border-slate-300 text-slate-900 text-sm font-bold text-emerald-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none"
-                  />
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">
-                    Rate Kiranas will see & order at
-                  </span>
+                {/* Submit Stock Inward */}
+                <button
+                  type="submit"
+                  disabled={inwardSubmitting || !selectedSkuId}
+                  className="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-md shadow-emerald-600/25 transition-all disabled:opacity-50"
+                >
+                  {inwardSubmitting ? (
+                    <span>Recording Stock to Godown...</span>
+                  ) : (
+                    <>
+                      <PackagePlus className="w-4 h-4" />
+                      <span>
+                        Confirm Stock Inward {inwardBags ? `(+${inwardBags} Bags)` : ''}
+                      </span>
+                    </>
+                  )}
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* MODE 2: BULK EXCEL / CSV UPLOAD */}
+          {inwardMode === 'excel' && (
+            <div className="space-y-6">
+              {/* Template Download Card */}
+              <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 rounded-2xl border border-emerald-200 p-4 sm:p-5 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2.5 rounded-xl bg-emerald-600 text-white shadow-xs shrink-0">
+                      <FileSpreadsheet className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-extrabold text-slate-900">
+                        1. Download Inward Excel / CSV Template
+                      </h3>
+                      <p className="text-xs text-slate-600 mt-0.5 max-w-xl">
+                        Pre-formatted with sample APMC lots (Rice, Atta, Edible Oil, Toor Dal, Sugar). Fill in your truck delivery items and upload. New commodities are created automatically.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadTemplate('xlsx')}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold shadow-xs transition-colors"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Download .XLSX</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadTemplate('csv')}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold border border-slate-300 shadow-xs transition-colors"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Download .CSV</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Supplier / Mill Name
-                </label>
-                <input
-                  type="text"
-                  value={supplierName}
-                  onChange={(e) => setSupplierName(e.target.value)}
-                  placeholder="Enter supplier / mill name"
-                  className="w-full p-2.5 rounded-xl border border-slate-300 text-slate-900 text-xs sm:text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none"
-                />
-              </div>
+              {/* Upload Dropzone Card */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 shadow-xs">
+                <h3 className="text-sm font-extrabold text-slate-900 mb-1">
+                  2. Upload Filled Spreadsheet
+                </h3>
+                <p className="text-xs text-slate-500 mb-4">
+                  Select your updated Excel (.xlsx, .xls) or CSV file. All rows will be parsed and validated before saving.
+                </p>
 
-              <button
-                type="submit"
-                disabled={inwardSubmitting}
-                className="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-md shadow-emerald-600/25 transition-all disabled:opacity-50"
-              >
-                {inwardSubmitting ? (
-                  <span>Recording Stock to Godown...</span>
-                ) : (
-                  <>
-                    <PackagePlus className="w-4 h-4" />
-                    <span>Confirm Stock Inward (+{inwardBags} Bags)</span>
-                  </>
+                {excelErrorMsg && (
+                  <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                    <span>{excelErrorMsg}</span>
+                  </div>
                 )}
-              </button>
-            </form>
-          </div>
+
+                {excelSuccessMsg && (
+                  <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>{excelSuccessMsg}</span>
+                  </div>
+                )}
+
+                {/* Dropzone Area */}
+                <label className="relative border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-6 sm:p-8 flex flex-col items-center justify-center cursor-pointer bg-slate-50 hover:bg-emerald-50/40 transition-colors group">
+                  <input
+                    type="file"
+                    accept=".xlsx, .xls, .csv"
+                    onChange={handleFileUpload}
+                    className="sr-only"
+                  />
+                  <div className="p-3 rounded-2xl bg-white text-emerald-600 shadow-xs group-hover:scale-110 transition-transform mb-2">
+                    <UploadCloud className="w-6 h-6" />
+                  </div>
+                  <p className="text-xs sm:text-sm font-extrabold text-slate-900 text-center">
+                    {excelFile ? excelFile.name : 'Click to select or drag & drop Excel / CSV'}
+                  </p>
+                  <p className="text-[11px] text-slate-400 text-center mt-0.5">
+                    Supports .xlsx, .xls, and .csv formats
+                  </p>
+                </label>
+
+                {/* Parsed Rows Preview Table */}
+                {parsedExcelRows.length > 0 && (
+                  <div className="mt-6 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-extrabold text-slate-900">
+                          Parsed File Preview ({parsedExcelRows.length} commodities)
+                        </span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                          Total {parsedExcelRows.reduce((sum, r) => sum + (r.bagsAdded || 0), 0)} bags
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setParsedExcelRows([]);
+                          setExcelFile(null);
+                        }}
+                        className="text-xs text-rose-600 hover:underline font-semibold self-start sm:self-auto"
+                      >
+                        Clear File
+                      </button>
+                    </div>
+
+                    <div className="overflow-x-auto rounded-xl border border-slate-200">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
+                          <tr>
+                            <th className="p-2.5">Category</th>
+                            <th className="p-2.5">Variety</th>
+                            <th className="p-2.5">Brand & Packaging</th>
+                            <th className="p-2.5 text-right">Bags Added</th>
+                            <th className="p-2.5 text-right">Cost (₹)</th>
+                            <th className="p-2.5 text-right">Bhav (₹)</th>
+                            <th className="p-2.5">Supplier</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 bg-white">
+                          {parsedExcelRows.map((row, idx) => (
+                            <tr key={idx} className="hover:bg-slate-50">
+                              <td className="p-2.5 font-bold text-slate-800 whitespace-nowrap">
+                                {row.category}
+                              </td>
+                              <td className="p-2.5 text-slate-700 whitespace-nowrap">
+                                {row.variety} {row.subType ? `(${row.subType})` : ''}
+                              </td>
+                              <td className="p-2.5 whitespace-nowrap">
+                                <span className="font-bold text-emerald-800">{row.brand}</span>{' '}
+                                <span className="text-slate-500 font-medium">({row.packagingType})</span>
+                              </td>
+                              <td className="p-2.5 text-right font-extrabold text-slate-900">
+                                +{row.bagsAdded}
+                              </td>
+                              <td className="p-2.5 text-right text-slate-700 font-semibold">
+                                ₹{row.purchaseCost}
+                              </td>
+                              <td className="p-2.5 text-right text-emerald-700 font-bold">
+                                ₹{row.sellingPrice}
+                              </td>
+                              <td className="p-2.5 text-slate-500 text-[11px] whitespace-nowrap">
+                                {row.supplier || '—'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Submit Bulk Inward Button */}
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        onClick={handleConfirmBulkInward}
+                        disabled={excelProcessing}
+                        className="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-md shadow-emerald-600/25 transition-all disabled:opacity-50"
+                      >
+                        {excelProcessing ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                            <span>Processing Bulk Inward to Godown...</span>
+                          </>
+                        ) : (
+                          <>
+                            <FileUp className="w-4 h-4" />
+                            <span>
+                              Confirm & Inward All {parsedExcelRows.length} Commodities (
+                              {parsedExcelRows.reduce((sum, r) => sum + (r.bagsAdded || 0), 0)} Bags)
+                            </span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </main>
       )}
 
@@ -1004,6 +1706,255 @@ export default function WholesalerPage() {
             })}
           </div>
         </main>
+      )}
+
+      {/* ADD NEW COMMODITY / SKU MODAL */}
+      {isNewSkuModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white w-full max-w-xl rounded-2xl p-5 sm:p-6 shadow-2xl border border-slate-200 my-8">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-emerald-100 text-emerald-800">
+                  <Sparkles className="w-4 h-4 text-emerald-700" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-extrabold text-slate-900">
+                    + Add New Commodity & Godown SKU
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Create a new APMC commodity and add initial stock to godown.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsNewSkuModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {newSkuError && (
+              <div className="mt-3 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>{newSkuError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleCreateNewSkuSubmit} className="space-y-3.5 mt-3.5">
+              {/* Category */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  Category Name <span className="text-rose-500">*</span>
+                </label>
+                <div className="flex flex-wrap gap-1 mb-2">
+                  {[
+                    'Rice (Chawal)',
+                    'Atta, Maida & Suji',
+                    'Pulses & Dal (Dalen)',
+                    'Edible Oils & Ghee',
+                    'Sugar & Jaggery (Shakkar)',
+                    'Spices & Masala',
+                  ].map((catPreset) => (
+                    <button
+                      type="button"
+                      key={catPreset}
+                      onClick={() => setNewCategoryName(catPreset)}
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-md transition-colors ${
+                        newCategoryName === catPreset
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-slate-100 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700'
+                      }`}
+                    >
+                      {catPreset}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="text"
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  placeholder="e.g. Rice (Chawal) or Spices"
+                  className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+                  required
+                />
+              </div>
+
+              {/* Variety & SubType */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    Variety / Item Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newVarietyName}
+                    onChange={(e) => setNewVarietyName(e.target.value)}
+                    placeholder="e.g. Basmati Rice, Toor Dal, Chakki Atta"
+                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    Sub-Type / Cut / Grade
+                  </label>
+                  <input
+                    type="text"
+                    value={newSubType}
+                    onChange={(e) => setNewSubType(e.target.value)}
+                    placeholder="e.g. 1121 Extra Long, Fatka Unpolished"
+                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Brand & Packaging */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    Brand / Marka <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newBrand}
+                    onChange={(e) => setNewBrand(e.target.value)}
+                    placeholder="e.g. Royal Crown, Fortune, Laxmi"
+                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    Packaging Type <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newPackagingType}
+                    onChange={(e) => setNewPackagingType(e.target.value)}
+                    placeholder="e.g. 25kg Bag, 50kg Bag, 15L Tin"
+                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Weight, Stock & Supplier */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    Net Weight (Kg) <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0.1"
+                    value={newWeightKg}
+                    onChange={(e) => setNewWeightKg(e.target.value)}
+                    placeholder="e.g. 25"
+                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    Initial Godown Stock <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={newInitialStock}
+                    onChange={(e) => setNewInitialStock(e.target.value)}
+                    placeholder="e.g. 100"
+                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-bold text-emerald-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    Supplier / Mill Name
+                  </label>
+                  <input
+                    type="text"
+                    value={newSupplier}
+                    onChange={(e) => setNewSupplier(e.target.value)}
+                    placeholder="e.g. Laxmi Agro Mill"
+                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Purchase Cost & Selling Price */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    Purchase / Landing Cost (₹/bag) <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="1"
+                    value={newPurchaseCost}
+                    onChange={(e) => setNewPurchaseCost(e.target.value)}
+                    placeholder="e.g. 2450"
+                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+                    required
+                  />
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">
+                    Your mill procurement price
+                  </span>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">
+                    Selling Mandi Bhav (₹/bag) <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="1"
+                    value={newSellingPrice}
+                    onChange={(e) => setNewSellingPrice(e.target.value)}
+                    placeholder="e.g. 2600"
+                    className="w-full p-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-bold text-emerald-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none"
+                    required
+                  />
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">
+                    Rate Kiranas will see & order
+                  </span>
+                </div>
+              </div>
+
+              {/* Modal Buttons */}
+              <div className="grid grid-cols-2 gap-3 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setIsNewSkuModalOpen(false)}
+                  className="py-2.5 px-4 rounded-xl border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingSku}
+                  className="py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold shadow-sm transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  {creatingSku ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Creating Commodity...</span>
+                    </>
+                  ) : (
+                    <>
+                      <PackagePlus className="w-4 h-4" />
+                      <span>Save & Add to Godown</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {/* ASSIGN TEMPO & DRIVER MODAL */}
