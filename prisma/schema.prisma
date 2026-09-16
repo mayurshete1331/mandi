@@ -1,0 +1,173 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  WHOLESALER
+  KIRANA
+}
+
+enum AccountStatus {
+  PENDING_APPROVAL
+  ACTIVE
+  REJECTED
+}
+
+enum OrderStatus {
+  NEW
+  PACKED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentMode {
+  CREDIT
+  COD
+  UPI
+}
+
+model User {
+  id                    String                         @id @default(uuid())
+  phoneNumber           String                         @unique
+  password              String
+  name                  String
+  role                  Role                           @default(KIRANA)
+  status                AccountStatus                  @default(ACTIVE)
+  shopName              String?
+  address               String?
+
+  // Multi-Wholesaler to Kirana Connections
+  retailerConnections   WholesalerRetailerConnection[] @relation("WholesalerSupplierConnections")
+  wholesalerConnections WholesalerRetailerConnection[] @relation("KiranaRetailerConnections")
+
+  // Products owned and stocked by Wholesaler in Godown
+  skus                  ProductSKU[]                   @relation("WholesalerSKUs")
+
+  // Orders placed (as Kirana) and orders received (as Wholesaler)
+  placedOrders          Order[]                        @relation("KiranaOrders")
+  receivedOrders        Order[]                        @relation("WholesalerOrders")
+
+  // Isolated Ledger entries
+  kiranaLedger          KhataEntry[]                   @relation("KiranaLedger")
+  wholesalerLedger      KhataEntry[]                   @relation("WholesalerLedger")
+
+  createdAt             DateTime                       @default(now())
+}
+
+model WholesalerRetailerConnection {
+  id             String        @id @default(uuid())
+  wholesalerId   String
+  wholesaler     User          @relation("WholesalerSupplierConnections", fields: [wholesalerId], references: [id], onDelete: Cascade)
+  retailerId     String
+  retailer       User          @relation("KiranaRetailerConnections", fields: [retailerId], references: [id], onDelete: Cascade)
+  status         AccountStatus @default(PENDING_APPROVAL)
+  creditLimit    Float         @default(0.0)
+  currentBalance Float         @default(0.0)
+
+  orders         Order[]
+  ledger         KhataEntry[]
+
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@unique([wholesalerId, retailerId])
+}
+
+model Category {
+  id        String    @id @default(uuid())
+  name      String
+  icon      String?
+  sortOrder Int       @default(0)
+  varieties Variety[]
+}
+
+model Variety {
+  id         String       @id @default(uuid())
+  categoryId String
+  category   Category     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  name       String
+  subType    String?      // e.g. "Full Grain", "Tibar", "Tukda", "Steam", "Raw"
+  skus       ProductSKU[]
+}
+
+model ProductSKU {
+  id            String         @id @default(uuid())
+  varietyId     String
+  variety       Variety        @relation(fields: [varietyId], references: [id], onDelete: Cascade)
+  wholesalerId  String
+  wholesaler    User           @relation("WholesalerSKUs", fields: [wholesalerId], references: [id], onDelete: Cascade)
+  brand         String         // e.g. "Royal Crown", "India Gate", "Mandi Marka"
+  packagingType String         // e.g. "25kg Bag", "50kg Bag", "15L Tin"
+  weightKg      Float
+  currentStock  Int            @default(0) // bag/tin count in godown
+  purchaseCost  Float          // Landing cost
+  sellingPrice  Float          // Live Mandi Bhav (rate per bag)
+  orderItems    OrderItem[]
+  inwardLogs    InventoryLog[]
+  updatedAt     DateTime       @updatedAt
+}
+
+model InventoryLog {
+  id          String     @id @default(uuid())
+  skuId       String
+  sku         ProductSKU @relation(fields: [skuId], references: [id], onDelete: Cascade)
+  bagsAdded   Int
+  costPerBag  Float
+  supplier    String?    // e.g. "Balaji Rice Mill"
+  notes       String?
+  createdAt   DateTime   @default(now())
+}
+
+model Order {
+  id            String                        @id @default(uuid())
+  orderNumber   String                        @unique
+  userId        String                        // Kirana Retailer ID
+  retailer      User                          @relation("KiranaOrders", fields: [userId], references: [id], onDelete: Cascade)
+  wholesalerId  String                        // Wholesaler ID
+  wholesaler    User                          @relation("WholesalerOrders", fields: [wholesalerId], references: [id], onDelete: Cascade)
+  connectionId  String?
+  connection    WholesalerRetailerConnection? @relation(fields: [connectionId], references: [id])
+  totalAmount   Float
+  totalBags     Int
+  totalWeightKg Float
+  status        OrderStatus                   @default(NEW)
+  paymentMode   PaymentMode                   @default(CREDIT)
+  driverName    String?
+  vehicleNumber String?
+  items         OrderItem[]
+  createdAt     DateTime                      @default(now())
+  updatedAt     DateTime                      @updatedAt
+}
+
+model OrderItem {
+  id          String     @id @default(uuid())
+  orderId     String
+  order       Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  skuId       String
+  sku         ProductSKU @relation(fields: [skuId], references: [id])
+  quantity    Int        // bag count
+  pricePerBag Float
+  totalPrice  Float
+}
+
+model KhataEntry {
+  id           String                        @id @default(uuid())
+  userId       String                        // Kirana Retailer ID
+  retailer     User                          @relation("KiranaLedger", fields: [userId], references: [id], onDelete: Cascade)
+  wholesalerId String                        // Wholesaler ID
+  wholesaler   User                          @relation("WholesalerLedger", fields: [wholesalerId], references: [id], onDelete: Cascade)
+  connectionId String?
+  connection   WholesalerRetailerConnection? @relation(fields: [connectionId], references: [id])
+  type         String                        // "DEBIT" (Invoice / Order) | "CREDIT" (Payment Received)
+  amount       Float
+  balanceAfter Float
+  reference    String?                       // e.g. "ORD-1001" or "UPI / Cash Receipt"
+  notes        String?
+  createdAt    DateTime                      @default(now())
+}
