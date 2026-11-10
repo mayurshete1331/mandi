@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
-import { Wheat, Store, ArrowRight, ShieldCheck, Truck, BookOpen, Layers, TrendingUp } from 'lucide-react';
+import { Wheat, Store, ArrowRight, ShieldCheck, Truck, BookOpen, Layers, TrendingUp, UserPlus } from 'lucide-react';
 
 export default async function HomePage() {
   const cookieStore = await cookies();
@@ -35,17 +35,27 @@ export default async function HomePage() {
                 MandiConnect
               </span>
               <span className="text-[11px] text-emerald-700 font-bold block">
-                B2B Mandi to Kirana Platform
+                B2B Mandi to Kirana Network
               </span>
             </div>
           </div>
 
-          <Link
-            href="/login"
-            className="py-2 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs sm:text-sm font-extrabold shadow-sm transition-all"
-          >
-            Sign In to Portal
-          </Link>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Link
+              href="/register"
+              className="py-2 px-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs sm:text-sm font-bold transition-all flex items-center gap-1.5"
+            >
+              <UserPlus className="w-3.5 h-3.5 text-emerald-700" />
+              <span>Register</span>
+            </Link>
+
+            <Link
+              href="/login"
+              className="py-2 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs sm:text-sm font-extrabold shadow-sm transition-all"
+            >
+              Sign In
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -53,7 +63,7 @@ export default async function HomePage() {
       <main className="max-w-4xl mx-auto px-4 py-12 flex-1 flex flex-col justify-center text-center">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100/80 text-emerald-900 text-xs font-bold mx-auto mb-5">
           <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
-          Direct Wholesale to Kirana Network
+          Direct Wholesale Mandi to Kirana Trading
         </div>
 
         <h1 className="text-3xl sm:text-5xl font-black text-slate-900 tracking-tight leading-tight mb-4">
@@ -63,11 +73,11 @@ export default async function HomePage() {
 
         <p className="text-sm sm:text-base text-slate-600 max-w-xl mx-auto mb-8">
           Eliminate telephone ordering chaos. Experience the ultra-fast{' '}
-          <strong>Mandi Matrix</strong> for complex commodities (Rice, Dal, Oil), live APMC rates,
+          <strong>Mandi Matrix</strong> for staple commodities (Rice, Dal, Oil, Atta), live daily APMC rates,
           and automated Bahi-Khata ledger tracking.
         </p>
 
-        {/* Action Buttons for Both Personas */}
+        {/* Action Cards for Both Personas */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-xl mx-auto w-full mb-12">
           <Link
             href="/login"
@@ -83,7 +93,7 @@ export default async function HomePage() {
               Mandi matrix quick order, live morning rates, 1-click repeat replenishment & bahi-khata.
             </p>
             <span className="text-xs font-bold text-emerald-600 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
-              Open Retailer Portal <ArrowRight className="w-3.5 h-3.5" />
+              Enter Retailer Portal <ArrowRight className="w-3.5 h-3.5" />
             </span>
           </Link>
 
@@ -101,7 +111,7 @@ export default async function HomePage() {
               Fast stock inward, morning Mandi Bhav ticker, live dispatch pipeline & Kirana credit control.
             </p>
             <span className="text-xs font-bold text-emerald-600 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
-              Open Wholesaler Portal <ArrowRight className="w-3.5 h-3.5" />
+              Enter Wholesaler Portal <ArrowRight className="w-3.5 h-3.5" />
             </span>
           </Link>
         </div>
@@ -138,7 +148,7 @@ export default async function HomePage() {
 
       {/* Footer */}
       <footer className="py-4 text-center border-t border-slate-200 text-xs text-slate-400">
-        MandiConnect • Production-grade B2B Architecture for Mandi Stockists & Kirana Stores
+        MandiConnect • B2B Wholesale Commodity Trading Network for Mandi Stockists & Kirana Stores
       </footer>
     </div>
   );

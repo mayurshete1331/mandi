@@ -1902,7 +1902,14 @@ export default function WholesalerPage() {
           </div>
 
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-            <div className="divide-y divide-slate-100">
+                        <div className="divide-y divide-slate-100">
+              {filteredSkus.length === 0 && (
+                <div className="p-8 text-center">
+                  <TrendingUp className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                  <p className="text-xs font-bold text-slate-700">No commodities in godown</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Use "+ Add Stock" tab to inward your first lot of grain or commodities.</p>
+                </div>
+              )}
               {filteredSkus.map((sku) => (
                 <div
                   key={sku.id}

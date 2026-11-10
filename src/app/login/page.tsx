@@ -63,14 +63,14 @@ export default function LoginPage() {
       <div className="max-w-md w-full mx-auto">
         {/* Brand Header */}
         <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-600 text-white text-3xl shadow-lg shadow-emerald-600/30 mb-3">
+          <Link href="/" className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-600 text-white text-3xl shadow-lg shadow-emerald-600/30 mb-3">
             🌾
-          </div>
+          </Link>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-            MandiConnect B2B
+            MandiConnect
           </h1>
           <p className="text-sm text-slate-600 mt-1">
-            Direct Mandi Wholesaler to Kirana Store Order & Khata System
+            Direct Mandi Wholesaler to Kirana Store Order & Bahi-Khata Network
           </p>
         </div>
 
@@ -84,7 +84,7 @@ export default function LoginPage() {
             <div className="mb-5 p-4 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs leading-relaxed flex items-start gap-2.5">
               <Clock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
               <div>
-                <strong className="font-extrabold block text-amber-950 mb-0.5">Approval Pending</strong>
+                <strong className="font-extrabold block text-amber-950 mb-0.5">Account Verification Pending</strong>
                 <span>{pendingNotice}</span>
               </div>
             </div>
@@ -107,6 +107,7 @@ export default function LoginPage() {
                 </div>
                 <input
                   type="tel"
+                  required
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
                   placeholder="Enter 10-digit mobile number"
@@ -125,6 +126,7 @@ export default function LoginPage() {
                 </div>
                 <input
                   type="password"
+                  required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
@@ -138,25 +140,24 @@ export default function LoginPage() {
               disabled={loading}
               className="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 transition-all disabled:opacity-50 mt-2"
             >
-              {loading ? 'Authenticating...' : 'Sign In'}
+              {loading ? 'Signing in...' : 'Sign In to Portal'}
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
 
-          {/* New Kirana Registration Link */}
+          {/* New Registration Link */}
           <div className="mt-5 text-center text-xs text-slate-600 bg-emerald-50/60 p-3 rounded-xl border border-emerald-100">
-            <span>New Kirana Store? </span>
+            <span>New Store or Mandi Wholesaler? </span>
             <Link href="/register" className="text-emerald-700 font-extrabold hover:underline">
-              Register & Request Wholesaler Access ➔
+              Create an Account ➔
             </Link>
           </div>
-
         </div>
 
-        {/* Security / Info footer */}
+        {/* Security / Trust footer */}
         <div className="text-center mt-5 text-xs text-slate-400 flex items-center justify-center gap-1.5">
           <ShieldCheck className="w-4 h-4 text-emerald-600" />
-          <span>Connected to Live MySQL Database (mandi_db)</span>
+          <span>256-Bit SSL Secured • MandiConnect Business Network</span>
         </div>
       </div>
     </div>

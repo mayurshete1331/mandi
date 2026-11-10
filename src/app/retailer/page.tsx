@@ -368,7 +368,7 @@ export default function RetailerPage() {
               </p>
             </div>
 
-            {/* WHOLESALER SWITCHER (OPTION A) */}
+            {/* Wholesaler Switcher */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               <div className="bg-emerald-950/40 backdrop-blur border border-emerald-500/30 rounded-2xl p-2.5 sm:p-3 min-w-[240px] sm:min-w-[300px]">
                 <div className="flex items-center justify-between gap-2 mb-1">
@@ -886,7 +886,16 @@ export default function RetailerPage() {
 
           {/* Commodities Matrix Accordion List */}
           <div className="space-y-4">
-            {filteredCategories.map((cat) => (
+            {filteredCategories.length === 0 && (
+            <div className="text-center py-12 bg-white rounded-2xl border border-slate-200 p-6 my-4">
+              <Wheat className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+              <h3 className="text-sm font-bold text-slate-800">No commodities available</h3>
+              <p className="text-xs text-slate-500 mt-1">
+                {searchQuery ? 'No commodities match your search.' : 'This Mandi wholesaler has not stocked commodities yet.'}
+              </p>
+            </div>
+          )}
+          {filteredCategories.map((cat) => (
               <div key={cat.id} className="space-y-3">
                 <div className="flex items-center justify-between border-b border-slate-200 pb-1">
                   <h2 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
